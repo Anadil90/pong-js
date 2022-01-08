@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        canvas {
+            position: absolute;
+            top: 17px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+
+        #buttonContainer {
+            width: 700px;
+            margin: 0 auto;
+            height: 100%;
+            padding: 0;
+        }
+
+        #resetGame {
+            float: left;
+            background-color: #ff0000;
+            color: #fff;
+            border: none;
+            padding: 7px;
+            cursor: pointer;
+            text-align: center;
+            
+        }
+    </style>
+
+    <title>pong</title>
+</head>
+<body>
+    <div id="buttonContainer"><button id="resetGame">Reset</button></div>
+
+    <script>
+        let pi = Math.PI, WIDTH=700, HEIGHT=600;
+        let player1, canvas,  ctx, ai, ball, keystate;
+        let up = 38, down = 40;
+
+        function reset() {
+            ball.x = player1.width + WIDTH/2 -31;
+            ball.y = HEIGHT/2;
+            ball.speed = 0;
+            player1.x = player1.width
+            player1.y = (HEIGHT - player1.height)/2
+            
+           
+        }
+
+        
+
+        player1 = {
+            x: null,
+            y: null,
+            width: 20,
+            height: 100,    
+            
+            update: function(){
+                if (keystate[up]) this.y -= 7;
+                if (keystate[down]) this.y += 7;
+                
+                // this.y = Math.max(Math.sin(this.y, HEIGHT - this.height, 0));
+            },
+
+            draw: function(){
+                ctx.fillRect(this.x, this.y, this.width, this.height)
+            }
+               
+        };
+
+        ai = {
+            x: null,
+            y: null,
+            width: 20,
+            height: 100,
+
+            update: function(){
+                let destination = ball.y - (this.height - ball.side)*0.5
+                this.y += (destination - this.y)* 0.1
+                // this.y = Math.max(Math.sin(this.y, HEIGHT - this.height, 0));   
+                
+                document.getElementById("resetGame").addEventListener("click", function() {
+                    reset()
+                })
+
+            },
+
+            draw: function(){
+                ctx.fillRect(this.x, this.y, this.width, this.height)
+
+            }
+               
+           
+                 
+        };
+
+        ball = {
+            x: null,
+            y: null,
+            side: 20,
+            velocity: null,
+            speed: 6,
+
+            serve: function(side) {
+                let rand = Math.random();
+                this.x = side === 1 ? player1.x : ai.x - this.side;
+                this.y = (HEIGHT - this.side) * rand;
+
+                let angle = 0.1*pi*(1 - 2 * rand);
+                this.velocity = {
+                    x: side*this.speed*Math.cos(angle),
+                    y: this.speed*Math.sin(angle)
+               }
+            } ,
+
+            update: function(){
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                // canvas collision bouce 
+                if(0 > this.y || this.y + this.side > HEIGHT) {
+                    // offset collision with canvas 
+                    let offset = this.velocity.y < 0 ? 0 - this.y : HEIGHT - (this.y + this.side)
+                    this.y += 2*offset;
+                    this.velocity.y *= -1;
+                    
+                    };
+                    // bounding box collision helper function 
+                    let AABBintersect = function(ax, ay, aw, ah, bx, by, bw, bh) {
+                        return ax < bx+bw && ay < by+bh && bx < ax+aw && by < ay+ah;
+                    };
+                    // paddle collision 
+                    let paddle = this.velocity.x < 0 ? player1 : ai;
+                    if(AABBintersect(paddle.x, paddle.y, paddle.width, paddle.height, 
+                        this.x, this.y, this.side, this.side)) {
+
+                            // paddle position
+                            this.x = paddle === player1 ? player1.x + player1.width : ai.x - this.side
+
+                            let n = (this.y + this.side - paddle.y)/(paddle.height + this.side);
+                            let angle = 0.25*pi*(2*n-1); //pi/4 = 45
+                    
+                            let smash = Math.abs(angle) > 0.2*pi ? 1.5 : 1;
+                            this.velocity.x = smash*(paddle === player1 ? 1 : -1)*this.speed*Math.cos(angle);
+                            this.velocity.y = smash*this.speed*Math.sin(angle);
+                            
+                        }
+
+                        if(0 > this.x + this.side || this.x > WIDTH) {
+                           
+                            this.serve(paddle === player1 ? 1 : -1 * ball.speed);
+                                
+                            
+                        }
+            },
+
+            draw: function(){
+                ctx.fillRect(this.x, this.y, this.side, this.side)
+            }
+            
+        };
+
+        // main function 
+        function main() {
+            canvas = document.createElement("canvas");
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT; 
+            ctx = canvas.getContext("2d");
+            document.body.appendChild(canvas);
+
+            keystate = {};
+            document.addEventListener("keydown", function(e){
+                keystate[e.keyCode] = true; 
+            })
+            document.addEventListener("keyup", function(e){
+                delete keystate[e.keyCode]
+            })
+
+            init();
+            let loop = function () {
+            update();
+            draw();
+
+            window.requestAnimationFrame(loop, canvas);
+        }
+        window.requestAnimationFrame(loop, canvas);
+
+        }
+
+        
+
+        
+        // initiate function 
+        function init() {
+            player1.x = player1.width;
+            player1.y = (HEIGHT - player1.height)/2
+
+            ai.x = WIDTH - (player1.width + ai.width);
+            ai.y = (HEIGHT - ai.height)/2;
+
+            ball.serve(1);
+        }
+
+        
+
+            // update function 
+        function update() {
+            ball.update();
+            player1.update();
+            ai.update();
+        }
+        
+        // draw function 
+        function draw() {
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            ball.draw();
+            ai.draw();
+            player1.draw();
+
+            
+
+            let w = 4,
+                x = (WIDTH - w)*0.5,
+                y = 0,
+             step = HEIGHT/20;
+
+             while (y < HEIGHT) {
+                 ctx.fillRect(x, y+step*0.25, w, step*0.56);
+                 y+= step;
+             }
+             ctx.restore();
+
+        }
+
+    main()
+
+    </script>
+
+</body>
+</html>
